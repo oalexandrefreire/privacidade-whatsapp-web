@@ -3,9 +3,32 @@
     filter: blur(7px) grayscale(1) !important;
 }
 
+.blurred-item:hover,
+.blurred-item:focus,
+.blurred-item:focus-within {
+    filter: none !important;
+}
+
+/* Exceção para o modo Entrada de texto: manter o blur durante a digitação (focus), revelando apenas no hover */
+.blurred-item.pww-blur-entrada:focus,
+.blurred-item.pww-blur-entrada:focus-within {
+    filter: blur(7px) grayscale(1) !important;
+}
+
+.blurred-item.pww-blur-entrada:hover,
+.blurred-item.pww-blur-entrada:hover:focus,
+.blurred-item.pww-blur-entrada:hover:focus-within {
+    filter: none !important;
+}
+
 #main .blurred-item img{
     transition: filter 0.2s ease-in-out;
     filter: blur(18px) grayscale(1) !important;
+}
+
+#main .blurred-item:hover img,
+#main .blurred-item:focus-within img {
+    filter: none !important;
 }
 
 #main .blurred-item video{
@@ -13,10 +36,25 @@
     filter: blur(18px) grayscale(1) !important;
 }
 
+#main .blurred-item:hover video,
+#main .blurred-item:focus-within video {
+    filter: none !important;
+}
+
 img.blurred-item {
     filter: blur(18px) grayscale(1) !important;
 }
 
+img.blurred-item:hover,
+img.blurred-item:focus {
+    filter: none !important;
+}
+
 video.blurred-item {
     filter: blur(25px) grayscale(1) !important;
+}
+
+video.blurred-item:hover,
+video.blurred-item:focus {
+    filter: none !important;
 }

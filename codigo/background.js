@@ -1,22 +1,16 @@
 chrome.runtime.onInstalled.addListener(() => {
     const defaultValues = {
-        blurNomesEnabled: false,
         blurMensagensEnabled: false,
-        blurPreviewEnabled: false,
         blurEntradaEnabled: false,
-        blurImagensEnabled: false
+        blurChatsEnabled: false
     };
 
-    chrome.storage.local.get(Object.keys(defaultValues).concat('blurEnabled'), (storedValues) => {
+    chrome.storage.local.get(Object.keys(defaultValues), (storedValues) => {
         const allBlurOptionsSet = Object.keys(defaultValues).every(key => storedValues[key] !== undefined);
 
         if (allBlurOptionsSet) {
             console.log("As opções de blur já estão preenchidas. A extensão já foi instalada.");
             return; 
-        }
-
-        if (storedValues.blurEnabled === undefined) {
-            storedValues.blurEnabled = true; 
         }
 
         for (const key in defaultValues) {

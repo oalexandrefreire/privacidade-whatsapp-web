@@ -1,179 +1,213 @@
-const applyBlur = ({
-    blurEnabled,
-    blurNomesEnabled,
-    blurMensagensEnabled,
-    blurPreviewEnabled,
-    blurEntradaEnabled,
-    blurImagensEnabled
-}) => {
+const STORAGE_KEYS = [
+    'blurMensagensEnabled',
+    'blurEntradaEnabled',
+    'blurChatsEnabled',
+    'blurNomesChatsEnabled',
+    'blurChatsImagensEnabled',
+    'blurChatsPreviaMensagemEnabled'
+];
 
-    const listaDeConversas = document.querySelectorAll('[role="listitem"]');
-    const mensagens = document.querySelectorAll('._amjv');
-    const mensagensFotosPerfil = document.querySelectorAll('.x1f5funs.x10l6tqk.x1wnpwf8.x1vjfegm');
-    const mensagensPerfilSemFoto = document.querySelectorAll('.x1rg5ohu.xk50ysn');
-    const cabecalhoConversas = document.querySelectorAll('#main header');
+const BLUR_CLASS = 'blurred-item';
+const LAYER_CLASSES = {
+    mensagens: 'pww-blur-mensagens',
+    entrada: 'pww-blur-entrada',
+    chats: 'pww-blur-chats',
+    nomesChats: 'pww-blur-nomes-chats',
+    chatsImagens: 'pww-blur-chats-imagens',
+    chatsPreviaMensagem: 'pww-blur-chats-previa'
+};
+const ALL_LAYER_CLASSES = Object.values(LAYER_CLASSES);
 
-    let fotoCabecalhoConversa = [];
-    mensagens.forEach(element => {
-        const images = element.querySelectorAll('img');
-        fotoCabecalhoConversa.push(...images);
-    });
-
-    mensagensFotosPerfil.forEach(element => {
-        const images = element.querySelectorAll('img');
-        fotoCabecalhoConversa.push(...images);
-    });
-
-    cabecalhoConversas.forEach(element => {
-        const images = element.querySelectorAll('img');
-        fotoCabecalhoConversa.push(...images);
-    });
-
-    //mensagens parcialmente desfocadas
-    const mensagens1 = document.querySelectorAll('.message-in');
-    const mensagens2 = document.querySelectorAll('.message-out');
-    const nomes1 = document.querySelectorAll('._ak8q');
-    const nomes2 = document.querySelectorAll('header ._ao3e');
-    const preview = document.querySelectorAll('._ak8j');
-    const entrada = document.querySelectorAll('._ak1r');
-    const fotos = document.querySelectorAll('._ak8h');
-    const fotosRespostasMensagens = document.querySelectorAll('.x10l6tqk.xh8yej3.x5yr21d.x1xsqp64.x18d0r48');
-    const videos = document.querySelectorAll('#main video');
-    const videosBase64 = document.querySelectorAll('._ahn8');
-
-    //desfoque parcial
-    desfocarElementos(nomes1, blurNomesEnabled);
-    desfocarElementos(nomes2, blurNomesEnabled);
-    desfocarElementos(mensagens1, blurMensagensEnabled);
-    desfocarElementos(mensagens2, blurMensagensEnabled);
-    desfocarElementos(preview, blurPreviewEnabled);
-    desfocarElementos(entrada, blurEntradaEnabled);
-    desfocarElementos(fotos,blurImagensEnabled);
-    desfocarElementos(mensagensPerfilSemFoto,blurImagensEnabled);
-    desfocarElementos(fotosRespostasMensagens,blurImagensEnabled);
-    desfocarElementos(videos,blurImagensEnabled);
-    desfocarElementos(videosBase64,blurImagensEnabled);
-    desfocarElementos(fotoCabecalhoConversa,blurImagensEnabled);
-
-    // desfoqueTotal
-    desfocarElementos(listaDeConversas,blurEnabled);
-    desfocarElementos(cabecalhoConversas,blurEnabled);
-    desfocarElementos(mensagens,blurEnabled);
-    desfocarElementos(mensagensFotosPerfil,blurEnabled);
+const DEFAULT_STATES = {
+    blurMensagensEnabled: false,
+    blurEntradaEnabled: false,
+    blurChatsEnabled: false,
+    blurNomesChatsEnabled: false,
+    blurChatsImagensEnabled: false,
+    blurChatsPreviaMensagemEnabled: false
 };
 
-const adicionarDesfoqueAosElementos = (elements, enabled) => {
-    elements.forEach(item => {
-        if (enabled) {
-            adicionarDesfoqueAoElementoEFilhos(item);
-        } else {
-            removerDesfoqueDoElementoEFilhos(item);
+let currentStates = { ...DEFAULT_STATES };
+let scheduledApply = null;
+
+const getElements = (selector, root = document) => Array.from(root.querySelectorAll(selector));
+
+const uniqueElements = (...collections) => {
+    const elements = new Set();
+
+    collections.flat().forEach(element => {
+        if (element instanceof Element) {
+            elements.add(element);
         }
     });
+
+    return Array.from(elements);
 };
 
-const adicionarDesfoqueAoElementoEFilhos = (element) => {
-    const addBlur = (selector, className) => {
-        element.querySelectorAll(selector).forEach(item => item.classList.add(className));
-    };
+const getChatRows = () => uniqueElements(
+    getElements('[role="row"][data-testid^="list-item-"]'),
+    getElements('[role="listitem"][data-testid^="list-item-"]')
+);
 
-    element.classList.add('blurred-item');
-};
+const getConversationItems = () => uniqueElements(
+    getElements('#pane-side [role="listitem"], [aria-label*="conversa" i] [role="listitem"]'),
+    getChatRows()
+);
 
-const removerDesfoqueDoElementoEFilhos = (elemento) => {
-    const removerDesfoque = (seletor, classe) => {
-        elemento.querySelectorAll(seletor).forEach(item => item.classList.remove(classe));
-    };
+const getChatContentElements = () => {
+    const chatContents = [];
 
-    elemento.classList.remove('blurred-item');
-};
-
-function desfocarElementos(elementos, enabled) {
-
-    elementos.forEach(elemento => {
-        let tolerancia = 10;
-        let mouseX = 0, mouseY = 0;
-        
-        // Só aplica desfoque inicialmente se o mouse não estiver em cima do elemento
-        if (!elemento.matches(':hover')) {
-            adicionarDesfoqueAosElementos([elemento], enabled);
-        }
-
-        elemento.addEventListener('mouseenter', (event) => {
-            // Remove o blur assim que o mouse entra
-            removerDesfoqueDoElementoEFilhos(elemento);
-            mouseX = event.clientX;
-            mouseY = event.clientY;
-        });
-        
-        // mousemove: Calcula a distância entre a posição atual do mouse e a posição inicial, usando o Teorema de Pitágoras para determinar a distância (distância Euclidiana). 
-        // Se a distância for maior que a tolerância definida, o blur é removido.
-        elemento.addEventListener('mousemove', (event) => {
-            let distancia = Math.sqrt(Math.pow(event.clientX - mouseX, 2) + Math.pow(event.clientY - mouseY, 2));
-            
-            if (distancia > tolerancia) {
-                removerDesfoqueDoElementoEFilhos(elemento);
-            }
-        });
-
-        elemento.addEventListener('mouseleave', () => {
-            if (!elemento.matches(':hover')) {
-                adicionarDesfoqueAosElementos([elemento], enabled);
-            }
-        });
+    getChatRows().forEach(row => {
+        chatContents.push(...getElements('[data-testid="cell-frame-title"] span[dir]', row));
+        chatContents.push(...getElements('[data-testid="cell-frame-primary-detail"] span', row));
+        chatContents.push(...getElements('[data-testid="cell-frame-secondary"] span[dir]', row));
+        chatContents.push(...getElements('[data-testid="cell-frame-secondary"] [data-testid="last-msg-status"]', row));
+        chatContents.push(...getElements('img', row));
     });
-}
 
-const observer = new MutationObserver(() => {
-    chrome.storage.local.get(['blurEnabled', 'blurNomesEnabled', 'blurMensagensEnabled', 'blurPreviewEnabled', 'blurEntradaEnabled', 'blurImagensEnabled'], (data) => {
-        const blurEnabled = data.blurEnabled !== undefined ? data.blurEnabled : false;
-        const blurNomesEnabled = data.blurNomesEnabled !== undefined ? data.blurNomesEnabled : false;
-        const blurMensagensEnabled = data.blurMensagensEnabled !== undefined ? data.blurMensagensEnabled : false;
-        const blurPreviewEnabled = data.blurPreviewEnabled !== undefined ? data.blurPreviewEnabled : false;
-        const blurEntradaEnabled = data.blurEntradaEnabled !== undefined ? data.blurEntradaEnabled : false;
-        const blurImagensEnabled = data.blurImagensEnabled !== undefined ? data.blurImagensEnabled : false;
+    return uniqueElements(chatContents);
+};
 
-        try {
-            applyBlur({
-                blurEnabled,
-                blurNomesEnabled,
-                blurMensagensEnabled,
-                blurPreviewEnabled,
-                blurEntradaEnabled,
-                blurImagensEnabled
-            });
-        } catch (error) {
-            console.error("Error during mutation observation: ", error);
-        }
+const getNomesChatsElements = () => {
+    const chatContents = [];
+
+    getChatRows().forEach(row => {
+        chatContents.push(...getElements('[data-testid="cell-frame-title"] span[dir]', row));
     });
+
+    return uniqueElements(chatContents);
+};
+
+const getChatsImagensElements = () => {
+    const chatContents = [];
+
+    getChatRows().forEach(row => {
+        chatContents.push(...getElements('img', row));
+    });
+
+    return uniqueElements(chatContents);
+};
+
+const getChatsPreviaMensagemElements = () => {
+    const chatContents = [];
+
+    getChatRows().forEach(row => {
+        chatContents.push(...getElements('[data-testid="cell-frame-secondary"] span[dir]', row));
+        chatContents.push(...getElements('[data-testid="cell-frame-secondary"] [data-testid="last-msg-status"]', row));
+    });
+
+    return uniqueElements(chatContents);
+};
+
+const getMessageElements = () => {
+    const messages = [];
+
+    getElements('#main [data-testid^="conv-msg-"]').forEach(message => {
+        const container = message.querySelector('[data-testid="msg-container"]');
+        messages.push(container || message);
+        messages.push(...getElements('[data-testid="addon-bubble-container"]', message));
+        messages.push(...getElements('[data-testid="reaction-bubble"]', message));
+    });
+
+    uniqueElements(
+        getElements('#main .message-in, #main .message-out'),
+        getElements('#main [data-id^="false_"], #main [data-id^="true_"]'),
+        getElements('#main [role="row"] [data-pre-plain-text]'),
+        getElements('#main div._amk4 > ._amk6'),
+        getElements('#main div._amk4 ._am2s'),
+        getElements('#main span._amk7')
+    ).forEach(element => {
+        messages.push(element.closest('[data-testid^="conv-msg-"] [data-testid="msg-container"], .message-in, .message-out, [data-id]') || element);
+    });
+
+    getElements('header[data-testid="conversation-header"]').forEach(header => {
+        messages.push(...getElements('[data-testid="conversation-info-header-chat-title"]', header));
+        messages.push(...getElements('img', header));
+    });
+
+    return uniqueElements(messages);
+};
+
+const getInputElements = () => uniqueElements(
+    getElements('#main footer [data-testid="compose-box"]'),
+    getElements('#main footer [data-testid="compose-box"] button'),
+    getElements('#main footer [data-testid="compose-box"] [aria-hidden="true"]'),
+    getElements('#main footer [data-testid="conversation-compose-box-input"]'),
+    getElements('#main footer [contenteditable="true"]'),
+    getElements('#main footer [role="textbox"]'),
+    getElements('div[contenteditable="true"][data-tab]')
+);
+
+const syncBlurClass = (element) => {
+    const hasActiveLayer = ALL_LAYER_CLASSES.some(className => element.classList.contains(className));
+    element.classList.toggle(BLUR_CLASS, hasActiveLayer);
+};
+
+const setLayerBlur = (layerClass, elements, enabled) => {
+    const selectedElements = new Set(elements);
+    const trackedElements = uniqueElements(
+        getElements(`.${layerClass}`),
+        Array.from(selectedElements)
+    );
+
+    trackedElements.forEach(element => {
+        element.classList.toggle(layerClass, Boolean(enabled) && selectedElements.has(element));
+        syncBlurClass(element);
+    });
+};
+
+const normalizeStates = (states = {}) => ({
+    blurMensagensEnabled: states.blurMensagensEnabled ?? false,
+    blurEntradaEnabled: states.blurEntradaEnabled ?? false,
+    blurChatsEnabled: states.blurChatsEnabled ?? false,
+    blurNomesChatsEnabled: states.blurNomesChatsEnabled ?? false,
+    blurChatsImagensEnabled: states.blurChatsImagensEnabled ?? false,
+    blurChatsPreviaMensagemEnabled: states.blurChatsPreviaMensagemEnabled ?? false
 });
 
+const applyBlur = (states) => {
+    currentStates = normalizeStates(states);
+
+    setLayerBlur(LAYER_CLASSES.mensagens, getMessageElements(), currentStates.blurMensagensEnabled);
+    setLayerBlur(LAYER_CLASSES.entrada, getInputElements(), currentStates.blurEntradaEnabled);
+    setLayerBlur(LAYER_CLASSES.chats, getChatContentElements(), currentStates.blurChatsEnabled);
+    setLayerBlur(LAYER_CLASSES.nomesChats, getNomesChatsElements(), currentStates.blurNomesChatsEnabled);
+    setLayerBlur(LAYER_CLASSES.chatsImagens, getChatsImagensElements(), currentStates.blurChatsImagensEnabled);
+    setLayerBlur(LAYER_CLASSES.chatsPreviaMensagem, getChatsPreviaMensagemElements(), currentStates.blurChatsPreviaMensagemEnabled);
+};
+
+const loadAndApplyBlur = () => {
+    chrome.storage.local.get(STORAGE_KEYS, data => {
+        try {
+            applyBlur(data);
+        } catch (error) {
+            console.error('PWW: error applying blur', error);
+        }
+    });
+};
+
+const scheduleApplyBlur = () => {
+    if (scheduledApply) {
+        clearTimeout(scheduledApply);
+    }
+
+    scheduledApply = setTimeout(() => {
+        scheduledApply = null;
+        applyBlur(currentStates);
+    }, 150);
+};
+
+loadAndApplyBlur();
+
+const observer = new MutationObserver(scheduleApplyBlur);
 observer.observe(document.body, { childList: true, subtree: true });
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     try {
-        
-        const {
-            blurEnabled,
-            blurNomesEnabled,
-            blurMensagensEnabled,
-            blurPreviewEnabled,
-            blurEntradaEnabled,
-            blurImagensEnabled
-        } = request;
-
-        applyBlur({
-            blurEnabled: blurEnabled !== undefined ? blurEnabled : false,
-            blurNomesEnabled: blurNomesEnabled !== undefined ? blurNomesEnabled : false,
-            blurMensagensEnabled: blurMensagensEnabled !== undefined ? blurMensagensEnabled : false,
-            blurPreviewEnabled: blurPreviewEnabled !== undefined ? blurPreviewEnabled : false,
-            blurEntradaEnabled: blurEntradaEnabled !== undefined ? blurEntradaEnabled : false,
-            blurImagensEnabled: blurImagensEnabled !== undefined ? blurImagensEnabled : false
-        });
-
-        sendResponse({ status: "success" }); 
+        applyBlur(request);
+        sendResponse({ status: 'success' });
     } catch (error) {
-        console.error("Error applying blur from message: ", error); 
-        sendResponse({ status: "error", message: error.message }); 
+        console.error('PWW: error applying blur from message', error);
+        sendResponse({ status: 'error', message: error.message });
     }
 });
